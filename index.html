@@ -8,15 +8,31 @@
 
 <style>
 
-body{
+html,body{
 margin:0;
-background:#d8c18a;
-font-family:sans-serif;
+height:100%;
 overflow:hidden;
+font-family:sans-serif;
+background:
+url("sand.jpg"),
+url("brick.png");
+background-size:cover;
+background-blend-mode:multiply;
 }
 
-#hud{
-color:#000;
+#splash{
+position:fixed;
+inset:0;
+background:black;
+color:white;
+display:flex;
+align-items:center;
+justify-content:center;
+z-index:20;
+font-size:24px;
+}
+
+#top{
 text-align:center;
 padding:8px;
 font-size:18px;
@@ -25,24 +41,24 @@ font-size:18px;
 #game{
 display:grid;
 grid-template-columns:repeat(4,1fr);
-gap:10px;
-padding:10px;
-height:75vh;
+gap:3vw;
+padding:4vw;
+height:70vh;
+box-sizing:border-box;
 }
 
 .card{
-background:#b48b4a;
-border-radius:10px;
+aspect-ratio:1/1;
+background:#c9a66b;
+border-radius:20px;
 display:flex;
 align-items:center;
 justify-content:center;
-font-size:40px;
+font-size:12vw;
 user-select:none;
 }
 
-.open{
-background:white;
-}
+.open{background:white}
 
 #overlay{
 position:fixed;
@@ -51,15 +67,24 @@ display:none;
 align-items:center;
 justify-content:center;
 background:rgba(0,0,0,.6);
+opacity:0;
+transition:.5s;
+z-index:10;
 }
+
+#overlay.show{opacity:1}
 
 #overlay img{
-width:70%;
-animation:fadein .6s;
+width:60vw;
+max-width:240px;
+animation:fade 1.4s;
 }
 
-@keyframes fadein{
-from{opacity:0}to{opacity:1}
+@keyframes fade{
+0%{opacity:0}
+30%{opacity:1}
+70%{opacity:1}
+100%{opacity:0}
 }
 
 #flash{
@@ -68,90 +93,120 @@ inset:0;
 background:white;
 opacity:0;
 pointer-events:none;
-transition:.5s;
+z-index:15;
+transition:.3s;
 }
-
-#aura{text-align:center;margin-top:4px;}
 
 </style>
 </head>
 
 <body>
 
+<div id="splash">กำลังโหลด...</div>
+
 <div id="flash"></div>
 
-<div id="hud">
-❤️ <span id="life">6</span>
- | ด่าน <span id="level">1</span>
+<div id="overlay"><img id="overlayImg"></div>
 
-<select id="mode">
+<div id="top">
+❤️ <span id="life">6</span>
+ด่าน <span id="level">1</span>
+
+<select id="mode" onchange="startGame()">
 <option value="easy">ง่าย</option>
 <option value="normal">ปกติ</option>
 <option value="hard">ยาก</option>
 <option value="extreme">โหด</option>
 </select>
-
-<div id="aura"></div>
 </div>
 
 <div id="game"></div>
 
-<div id="overlay"><img id="overlayImg"></div>
-
 <script>
 
-const notes=["𝅝","𝅗𝅥","♩","♪","𝄻","𝄼","𝄽","𝄾"];
+setTimeout(()=>splash.style.display="none",1500);
 
-const correct=new Audio("correct.mp3");
-const wrong=new Audio("wrong.mp3");
-const win=new Audio("win.mp3");
-const lose=new Audio("lose.mp3");
+// sounds
+const correctSound=new Audio("correct.mp3");
+const wrongSound=new Audio("wrong.mp3");
+const winSound=new Audio("win.mp3");
+const loseSound=new Audio("lose.mp3");
+const flashSound=new Audio("flashbang.mp3");
 
-let life=6,level=1,first=null,lock=false,match=0;
+const sounds=[correctSound,wrongSound,winSound,loseSound,flashSound];
 
-const modePairs={
-easy:2,
-normal:3,
-hard:4,
-extreme:4
-};
+function fadeSound(s){
+sounds.forEach(x=>{x.pause();x.currentTime=0});
+s.volume=1;
+s.play();
+}
 
-function fadeOut(a){
-let v=1;
+function fadeOut(s){
 let i=setInterval(()=>{
-v-=0.05;
-a.volume=v;
-if(v<=0){clearInterval(i);a.pause();a.volume=1;}
-},50);
+s.volume-=0.1;
+if(s.volume<=0){
+s.pause();
+clearInterval(i);
+}
+},80);
 }
 
-function overlay(img){
-const o=document.getElementById("overlay");
-document.getElementById("overlayImg").src=img;
-o.style.display="flex";
-setTimeout(()=>o.style.display="none",1500);
+const notes=["𝅝","𝅗𝅥","♩","♪","𝄻","𝄼","𝄽","𝄾"];
+const modes={easy:3,normal:4,hard:6,extreme:8};
+
+let life=6,level=1,first=null,lock=true,match=0;
+
+function vibrate(){navigator.vibrate?.(200);}
+
+function show(img,victory=false){
+
+lock=true;
+overlayImg.src=img;
+overlay.style.display="flex";
+setTimeout(()=>overlay.classList.add("show"),10);
+
+if(victory){
+flash.style.opacity=1;
+flashSound.play();
+setTimeout(()=>flash.style.opacity=0,300);
 }
 
-function aura(x){
-document.getElementById("aura").innerText="Aura "+x;
+setTimeout(()=>{
+overlay.classList.remove("show");
+fadeOut(correctSound);
+fadeOut(wrongSound);
+fadeOut(winSound);
+fadeOut(loseSound);
+},1200);
+
+setTimeout(()=>{
+overlay.style.display="none";
+lock=false;
+},1600);
+
+}
+
+function startGame(){
+life=6;
+level=1;
+build();
 }
 
 function build(){
 
-document.getElementById("life").innerText=life;
-document.getElementById("level").innerText=level;
+lock=true;
+sounds.forEach(x=>{x.pause();x.currentTime=0});
 
-const g=document.getElementById("game");
-g.innerHTML="";
-match=0;first=null;
+lifeSpan.innerText=life;
+levelSpan.innerText=level;
+game.innerHTML="";
+first=null;
+match=0;
 
-let p=modePairs[mode.value];
+let p=modes[mode.value];
 let arr=[];
 
-for(let i=0;i<p;i++){
-arr.push(notes[i],notes[i]);
-}
-
+for(let i=0;i<p;i++)arr.push(notes[i],notes[i]);
 arr.sort(()=>Math.random()-0.5);
 
 arr.forEach(n=>{
@@ -167,36 +222,35 @@ c.innerText=n;
 
 if(!first){first=c;return;}
 
+lock=true;
+
 if(first.innerText===n){
 
-correct.play();
+fadeSound(correctSound);
+show("win.png");
 match++;
-aura("+");
-
 first=null;
 
-if(match===p){
-win.play();
-overlay("victory.png");
-
-document.getElementById("flash").style.opacity=1;
-setTimeout(()=>document.getElementById("flash").style.opacity=0,400);
-
 setTimeout(()=>{
-level++;
-build();
-},2000);
-}
+if(match===p){
+ if(mode.value==="extreme"){
+  fadeSound(winSound);
+  show("victory.png",true);
+ }else{
+  level++;
+  fadeSound(winSound);
+  build();
+ }
+}else lock=false;
+},1600);
 
 }else{
 
-wrong.play();
-setTimeout(()=>fadeOut(wrong),600);
-
+fadeSound(wrongSound);
+show("wrong.png");
+vibrate();
 life--;
-aura("-");
-
-lock=true;
+lifeSpan.innerText=life;
 
 setTimeout(()=>{
 first.classList.remove("open");
@@ -204,31 +258,36 @@ c.classList.remove("open");
 first.innerText="";
 c.innerText="";
 first=null;
-lock=false;
-},1200);
 
 if(life<=0){
-lose.play();
-overlay("lose.png");
-}
+ fadeSound(loseSound);
+ show("lose.png");
+}else lock=false;
+
+},1600);
+
 }
 
 };
 
-g.appendChild(c);
+game.appendChild(c);
 });
 
+setTimeout(()=>lock=false,400);
 }
 
-mode.onchange=()=>{
-life=6;
-level=1;
-build();
-}
+const game=document.getElementById("game");
+const overlay=document.getElementById("overlay");
+const overlayImg=document.getElementById("overlayImg");
+const lifeSpan=document.getElementById("life");
+const levelSpan=document.getElementById("level");
+const mode=document.getElementById("mode");
+const splash=document.getElementById("splash");
+const flash=document.getElementById("flash");
 
-build();
+startGame();
 
 </script>
 
 </body>
- </html>
+</html>
